@@ -3,12 +3,15 @@ package com.example.myapplication1.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication1.data.api.GenreInfo
+import com.example.myapplication1.data.local.entity.WatchlistItem
 import com.example.myapplication1.data.model.*
 import com.example.myapplication1.data.network.ApiResult
 import com.example.myapplication1.data.repository.MangaRepository
+import com.example.myapplication1.data.repository.WatchlistRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /**
@@ -63,9 +66,14 @@ data class GenreState(
  * - Content filtering / hentai filter (from MyApplication1)
  * - Genre selection clearing (from Manga-Mobile)
  */
-class MangaViewModel : ViewModel() {
+class MangaViewModel(
+    private val watchlistRepository: WatchlistRepository? = null
+) : ViewModel() {
     
     private val repository = MangaRepository.getInstance()
+    
+    // Current user ID for watchlist operations
+    private var currentUserId: String? = null
     
     // Top manga state
     private val _topMangaState = MutableStateFlow(MangaListState())
@@ -103,13 +111,17 @@ class MangaViewModel : ViewModel() {
     
     // ========== Watchlist (from Manga-Mobile) ==========
     
-    // Watchlist state - stored as Set for quick lookup
+    // Watchlist state - stored as Set for quick lookup (for backward compatibility)
     private val _watchlistIds = MutableStateFlow<Set<Int>>(emptySet())
     val watchlistIds: StateFlow<Set<Int>> = _watchlistIds.asStateFlow()
     
-    // Watchlist manga items
+    // Watchlist manga items (from database)
     private val _watchlistManga = MutableStateFlow<List<Manga>>(emptyList())
     val watchlistManga: StateFlow<List<Manga>> = _watchlistManga.asStateFlow()
+    
+    // Watchlist items from database
+    private val _watchlistItems = MutableStateFlow<List<WatchlistItem>>(emptyList())
+    val watchlistItems: StateFlow<List<WatchlistItem>> = _watchlistItems.asStateFlow()
     
     init {
         loadTopManga()
@@ -512,21 +524,76 @@ class MangaViewModel : ViewModel() {
     // ========== Watchlist Methods (from Manga-Mobile) ==========
     
     /**
-     * Check if manga is in watchlist
+     * Set current user ID for watchlist operations
+     */
+    fun setCurrentUserId(userId: String?) {
+        currentUserId = userId
+        if (userId != null && watchlistRepository != null) {
+            // Observe watchlist changes
+            viewModelScope.launch {
+                watchlistRepository.getWatchlistByUserId(userId).collect { items ->
+                    _watchlistItems.value = items
+                    _watchlistIds.value = items.map { it.mangaId }.toSet()
+                    // Load full manga details for watchlist items
+                    refreshWatchlistMangaFromItems(items)
+                }
+            }
+        } else {
+            _watchlistItems.value = emptyList()
+            _watchlistIds.value = emptySet()
+            _watchlistManga.value = emptyList()
+        }
+    }
+    
+    /**
+     * Check if manga is in watchlist (synchronous check using cached state)
      */
     fun isInWatchlist(mangaId: Int): Boolean {
         return mangaId in _watchlistIds.value
     }
     
     /**
+     * Check if manga is in watchlist (async, updates state)
+     */
+    fun checkWatchlistStatus(mangaId: Int) {
+        if (watchlistRepository != null && currentUserId != null) {
+            viewModelScope.launch {
+                val exists = watchlistRepository.isMangaInWatchlist(currentUserId!!, mangaId)
+                // Update local state
+                if (exists && mangaId !in _watchlistIds.value) {
+                    _watchlistIds.value = _watchlistIds.value + mangaId
+                } else if (!exists && mangaId in _watchlistIds.value) {
+                    _watchlistIds.value = _watchlistIds.value - mangaId
+                }
+            }
+        }
+    }
+    
+    /**
      * Add manga to watchlist
      */
     fun addToWatchlist(manga: Manga) {
-        val newIds = _watchlistIds.value + manga.malId
-        _watchlistIds.value = newIds
-        val currentManga = _watchlistManga.value
-        if (manga !in currentManga) {
-            _watchlistManga.value = currentManga + manga
+        if (watchlistRepository != null && currentUserId != null) {
+            // Use database
+            viewModelScope.launch {
+                val result = watchlistRepository.addToWatchlist(currentUserId!!, manga)
+                result.fold(
+                    onSuccess = {
+                        // State will be updated automatically via Flow
+                    },
+                    onFailure = {
+                        // Handle error if needed
+                    }
+                )
+            }
+        } else {
+            // Fallback to in-memory storage
+            val newIds = _watchlistIds.value + manga.malId
+            _watchlistIds.value = newIds
+            val currentManga = _watchlistManga.value
+            if (manga !in currentManga) {
+                _watchlistManga.value = currentManga + manga
+            }
         }
     }
     
@@ -534,33 +601,79 @@ class MangaViewModel : ViewModel() {
      * Remove manga from watchlist
      */
     fun removeFromWatchlist(mangaId: Int) {
-        val newIds = _watchlistIds.value - mangaId
-        _watchlistIds.value = newIds
-        _watchlistManga.value = _watchlistManga.value.filter { it.malId != mangaId }
+        if (watchlistRepository != null && currentUserId != null) {
+            // Use database
+            viewModelScope.launch {
+                val result = watchlistRepository.removeFromWatchlist(currentUserId!!, mangaId)
+                result.fold(
+                    onSuccess = {
+                        // State will be updated automatically via Flow
+                    },
+                    onFailure = {
+                        // Handle error if needed
+                    }
+                )
+            }
+        } else {
+            // Fallback to in-memory storage
+            val newIds = _watchlistIds.value - mangaId
+            _watchlistIds.value = newIds
+            _watchlistManga.value = _watchlistManga.value.filter { it.malId != mangaId }
+        }
     }
     
     /**
      * Load full details for watchlist manga
      */
     fun refreshWatchlistManga() {
-        viewModelScope.launch {
-            val ids = _watchlistIds.value
-            if (ids.isEmpty()) {
-                _watchlistManga.value = emptyList()
-                return@launch
+        if (watchlistRepository != null && currentUserId != null) {
+            // Load from database items
+            viewModelScope.launch {
+                val items = watchlistRepository.getWatchlistByUserIdSuspend(currentUserId!!)
+                refreshWatchlistMangaFromItems(items)
             }
-            
-            val loadedManga = mutableListOf<Manga>()
-            ids.forEach { mangaId ->
-                when (val result = repository.getMangaById(mangaId)) {
-                    is ApiResult.Success -> {
-                        loadedManga.add(result.data)
-                    }
-                    else -> {}
+        } else {
+            // Fallback to in-memory
+            viewModelScope.launch {
+                val ids = _watchlistIds.value
+                if (ids.isEmpty()) {
+                    _watchlistManga.value = emptyList()
+                    return@launch
                 }
+                
+                val loadedManga = mutableListOf<Manga>()
+                ids.forEach { mangaId ->
+                    when (val result = repository.getMangaById(mangaId)) {
+                        is ApiResult.Success -> {
+                            loadedManga.add(result.data)
+                        }
+                        else -> {}
+                    }
+                }
+                _watchlistManga.value = loadedManga
             }
-            _watchlistManga.value = loadedManga
         }
+    }
+    
+    /**
+     * Refresh watchlist manga from database items
+     */
+    private suspend fun refreshWatchlistMangaFromItems(items: List<WatchlistItem>) {
+        if (items.isEmpty()) {
+            _watchlistManga.value = emptyList()
+            return
+        }
+        
+        val loadedManga = mutableListOf<Manga>()
+        items.forEach { item ->
+            when (val result = repository.getMangaById(item.mangaId)) {
+                is ApiResult.Success -> {
+                    loadedManga.add(result.data)
+                }
+                else -> {}
+            }
+        }
+        _watchlistManga.value = loadedManga
     }
 }
 
