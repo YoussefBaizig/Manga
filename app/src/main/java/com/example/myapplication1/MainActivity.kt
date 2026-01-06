@@ -1,9 +1,9 @@
 package com.example.myapplication1
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -29,7 +29,7 @@ import com.example.myapplication1.ui.viewmodel.MangaViewModel
 import com.example.myapplication1.ui.viewmodel.UserViewModel
 import com.example.myapplication1.ui.viewmodel.ViewModelFactory
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -111,7 +111,7 @@ fun MangaApp() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = if (authState.isAuthenticated) Screen.Home.route else Screen.Login.route,
+            startDestination = Screen.FirstPage.route,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
@@ -119,6 +119,24 @@ fun MangaApp() {
                     bottom = if (showBottomBar) 0.dp else innerPadding.calculateBottomPadding()
                 )
         ) {
+            // First Page - Splash screen with fingerprint authentication
+            composable(Screen.FirstPage.route) {
+                FirstPage(
+                    onNavigateToHome = {
+                        // Navigate to appropriate screen based on auth state
+                        if (authState.isAuthenticated) {
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(0) // Clear back stack
+                            }
+                        } else {
+                            navController.navigate(Screen.Login.route) {
+                                popUpTo(0) // Clear back stack
+                            }
+                        }
+                    }
+                )
+            }
+            
             // Authentication Screens
             composable(Screen.Login.route) {
                 LoginScreen(

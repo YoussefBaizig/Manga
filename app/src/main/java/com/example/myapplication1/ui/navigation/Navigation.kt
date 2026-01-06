@@ -35,6 +35,7 @@ sealed class Screen(val route: String) {
     data object Watchlist : Screen("watchlist")
     data object Login : Screen("login")
     data object Signup : Screen("signup")
+    data object FirstPage : Screen("first_page")
 }
 
 /**
