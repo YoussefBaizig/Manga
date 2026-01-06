@@ -72,6 +72,9 @@ dependencies {
     implementation(libs.room.ktx)
     kapt(libs.room.compiler)
     
+    // Biometric authentication
+    implementation(libs.androidx.biometric)
+    
     // Material Icons Extended (use BOM version)
     implementation("androidx.compose.material:material-icons-extended")
     
