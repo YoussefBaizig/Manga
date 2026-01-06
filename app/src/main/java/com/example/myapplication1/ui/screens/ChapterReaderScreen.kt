@@ -602,28 +602,28 @@ private fun ChapterReaderContent(
                             overflow = TextOverflow.Ellipsis
                         )
                         // Show sensor status and theme
-                        val statusText = buildString {
-                            append("Page ${currentPageIndex + 1}/${pageUrls.size}")
-                            if (adaptiveThemeEnabled) {
-                                append(" | ")
-                                append(
-                                    when (currentAdaptiveTheme) {
-                                        AdaptiveReadingTheme.NIGHT_MODE -> "🌙 Mode Nuit"
-                                        AdaptiveReadingTheme.NORMAL_MODE -> "💡 Mode Normal"
-                                        AdaptiveReadingTheme.HIGH_CONTRAST_MODE -> "☀️ Contraste Élevé"
-                                    }
-                                )
-                            }
-                            if (sensorsAvailable && sensorState != null) {
-                                append(" | ")
-                                append(getOrientationDisplayName(sensorState!!.orientation))
-                            }
-                        }
-                        Text(
-                            text = statusText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = adaptiveColorScheme.onSurfaceVariant
-                        )
+                        // val statusText = buildString {
+                        //     append("Page ${currentPageIndex + 1}/${pageUrls.size}")
+                        //     if (adaptiveThemeEnabled) {
+                        //         append(" | ")
+                        //         append(
+                        //             when (currentAdaptiveTheme) {
+                        //                 AdaptiveReadingTheme.NIGHT_MODE -> "🌙 Mode Nuit"
+                        //                 AdaptiveReadingTheme.NORMAL_MODE -> "💡 Mode Normal"
+                        //                 AdaptiveReadingTheme.HIGH_CONTRAST_MODE -> "☀️ Contraste Élevé"
+                        //             }
+                        //         )
+                        //     }
+                        //     if (sensorsAvailable && sensorState != null) {
+                        //         append(" | ")
+                        //         append(getOrientationDisplayName(sensorState!!.orientation))
+                        //     }
+                        // }
+                        // Text(
+                        //     text = statusText,
+                        //     style = MaterialTheme.typography.labelSmall,
+                        //     color = adaptiveColorScheme.onSurfaceVariant
+                        // )
                     }
             },
             navigationIcon = {
@@ -636,74 +636,7 @@ private fun ChapterReaderContent(
                     }
                 },
             actions = {
-                // Debug panel button (always visible)
-                IconButton(
-                    onClick = { 
-                        DebugLogManager.addMessage("ChapterReader", "Debug panel toggle clicked", DebugLevel.INFO)
-                        showDebugPanel = !showDebugPanel 
-                    }
-                ) {
-                    Text(
-                        text = if (showDebugPanel) "🐛" else "🔍",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
-                // Toggle position sensor info button
-                if (positionAvailable) {
-                    IconButton(
-                        onClick = { 
-                            DebugLogManager.addMessage("ChapterReader", "Position info toggle clicked", DebugLevel.INFO)
-                            showPositionInfo = !showPositionInfo 
-                        }
-                    ) {
-                        Text(
-                            text = if (showPositionInfo) "📍" else "🧭",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
-                }
-                // Toggle light sensor info button
-                if (lightAvailable) {
-                    IconButton(
-                        onClick = { 
-                            DebugLogManager.addMessage("ChapterReader", "Light info toggle clicked", DebugLevel.INFO)
-                            showLightInfo = !showLightInfo 
-                        }
-                    ) {
-                        Text(
-                            text = if (showLightInfo) "💡" else "☀️",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
-                }
-                // Toggle LiDAR info button
-                if (lidarAvailable) {
-                    IconButton(
-                        onClick = { 
-                            DebugLogManager.addMessage("ChapterReader", "LiDAR info toggle clicked", DebugLevel.INFO)
-                            showLidarInfo = !showLidarInfo 
-                        }
-                    ) {
-                        Text(
-                            text = if (showLidarInfo) "📏" else "🔦",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
-                }
-                // Toggle sensor info button
-                if (sensorsAvailable) {
-                    IconButton(
-                        onClick = { 
-                            DebugLogManager.addMessage("ChapterReader", "Sensor info toggle clicked", DebugLevel.INFO)
-                            showSensorInfo = !showSensorInfo 
-                        }
-                    ) {
-                        Text(
-                            text = if (showSensorInfo) "👁️" else "📊",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
-                }
+                // Sensor buttons hidden - functionality still works via sensors
             },
             colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = adaptiveColorScheme.surface.copy(alpha = 0.9f)
