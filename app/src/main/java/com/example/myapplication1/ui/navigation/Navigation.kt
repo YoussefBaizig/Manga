@@ -33,6 +33,8 @@ sealed class Screen(val route: String) {
     data object TopRated : Screen("top_rated")
     data object Popular : Screen("popular")
     data object Watchlist : Screen("watchlist")
+    data object Login : Screen("login")
+    data object Signup : Screen("signup")
 }
 
 /**

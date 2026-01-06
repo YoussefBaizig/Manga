@@ -26,6 +26,8 @@ import com.example.myapplication1.ui.navigation.bottomNavItems
 import com.example.myapplication1.ui.screens.*
 import com.example.myapplication1.ui.theme.*
 import com.example.myapplication1.ui.viewmodel.MangaViewModel
+import com.example.myapplication1.ui.viewmodel.UserViewModel
+import com.example.myapplication1.ui.viewmodel.ViewModelFactory
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,9 +44,36 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MangaApp() {
     val navController = rememberNavController()
-    val viewModel: MangaViewModel = viewModel()
+    val application = androidx.compose.ui.platform.LocalContext.current.applicationContext as MangaApplication
+    val viewModelFactory = remember { ViewModelFactory.create(application) }
+    val mangaViewModel: MangaViewModel = viewModel(factory = viewModelFactory)
+    val userViewModel: UserViewModel = viewModel(factory = viewModelFactory)
+    
+    val authState by userViewModel.authState.collectAsState()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    
+    // Set current user ID in MangaViewModel when authenticated
+    LaunchedEffect(authState.isAuthenticated, authState.currentUser) {
+        if (authState.isAuthenticated && authState.currentUser != null) {
+            mangaViewModel.setCurrentUserId(authState.currentUser!!.id)
+        } else {
+            mangaViewModel.setCurrentUserId(null)
+        }
+    }
+    
+    // Navigate based on authentication state
+    LaunchedEffect(authState.isAuthenticated) {
+        if (!authState.isAuthenticated && currentRoute != Screen.Login.route && currentRoute != Screen.Signup.route) {
+            navController.navigate(Screen.Login.route) {
+                popUpTo(0) // Clear back stack
+            }
+        } else if (authState.isAuthenticated && (currentRoute == Screen.Login.route || currentRoute == Screen.Signup.route)) {
+            navController.navigate(Screen.Home.route) {
+                popUpTo(0) // Clear back stack
+            }
+        }
+    }
     
     // Determine if bottom bar should be shown
     val showBottomBar = currentRoute in listOf(
@@ -52,7 +81,7 @@ fun MangaApp() {
         Screen.Search.route,
         Screen.Explore.route,
         Screen.Watchlist.route
-    )
+    ) && authState.isAuthenticated
     
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -68,7 +97,7 @@ fun MangaApp() {
                     onNavigate = { route ->
                         // Clear genre selection when navigating to Explore
                         if (route == Screen.Explore.route) {
-                            viewModel.clearGenreSelection()
+                            mangaViewModel.clearGenreSelection()
                         }
                         navController.navigate(route) {
                             popUpTo(Screen.Home.route) { saveState = true }
@@ -82,7 +111,7 @@ fun MangaApp() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Home.route,
+            startDestination = if (authState.isAuthenticated) Screen.Home.route else Screen.Login.route,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
@@ -90,9 +119,39 @@ fun MangaApp() {
                     bottom = if (showBottomBar) 0.dp else innerPadding.calculateBottomPadding()
                 )
         ) {
+            // Authentication Screens
+            composable(Screen.Login.route) {
+                LoginScreen(
+                    userViewModel = userViewModel,
+                    onLoginSuccess = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(0) // Clear back stack
+                        }
+                    },
+                    onNavigateToSignup = {
+                        navController.navigate(Screen.Signup.route)
+                    }
+                )
+            }
+            
+            composable(Screen.Signup.route) {
+                SignupScreen(
+                    userViewModel = userViewModel,
+                    onSignupSuccess = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(0) // Clear back stack
+                        }
+                    },
+                    onNavigateToLogin = {
+                        navController.navigate(Screen.Login.route)
+                    }
+                )
+            }
+            
+            // Main App Screens (only accessible when authenticated)
             composable(Screen.Home.route) {
                 HomeScreen(
-                    viewModel = viewModel,
+                    viewModel = mangaViewModel,
                     onMangaClick = { mangaId ->
                         navController.navigate(Screen.Detail.createRoute(mangaId))
                     },
@@ -107,7 +166,7 @@ fun MangaApp() {
             
             composable(Screen.Search.route) {
                 SearchScreen(
-                    viewModel = viewModel,
+                    viewModel = mangaViewModel,
                     onMangaClick = { mangaId ->
                         navController.navigate(Screen.Detail.createRoute(mangaId))
                     }
@@ -117,11 +176,11 @@ fun MangaApp() {
             composable(Screen.Explore.route) { backStackEntry ->
                 // Clear genre selection when navigating to Explore to always show genre list
                 LaunchedEffect(backStackEntry) {
-                    viewModel.clearGenreSelection()
+                    mangaViewModel.clearGenreSelection()
                 }
                 
                 ExploreScreen(
-                    viewModel = viewModel,
+                    viewModel = mangaViewModel,
                     onMangaClick = { mangaId ->
                         navController.navigate(Screen.Detail.createRoute(mangaId))
                     }
@@ -130,7 +189,7 @@ fun MangaApp() {
             
             composable(Screen.TopRated.route) {
                 TopRatedListScreen(
-                    viewModel = viewModel,
+                    viewModel = mangaViewModel,
                     onBackClick = { navController.popBackStack() },
                     onMangaClick = { mangaId ->
                         navController.navigate(Screen.Detail.createRoute(mangaId))
@@ -140,7 +199,7 @@ fun MangaApp() {
             
             composable(Screen.Popular.route) {
                 PopularListScreen(
-                    viewModel = viewModel,
+                    viewModel = mangaViewModel,
                     onBackClick = { navController.popBackStack() },
                     onMangaClick = { mangaId ->
                         navController.navigate(Screen.Detail.createRoute(mangaId))
@@ -150,7 +209,7 @@ fun MangaApp() {
             
             composable(Screen.Watchlist.route) {
                 WatchlistScreen(
-                    viewModel = viewModel,
+                    viewModel = mangaViewModel,
                     onMangaClick = { mangaId ->
                         navController.navigate(Screen.Detail.createRoute(mangaId))
                     }
@@ -166,7 +225,7 @@ fun MangaApp() {
                 val mangaId = backStackEntry.arguments?.getInt("mangaId") ?: return@composable
                 DetailScreen(
                     mangaId = mangaId,
-                    viewModel = viewModel,
+                    viewModel = mangaViewModel,
                     onBackClick = { navController.popBackStack() },
                     onMangaClick = { id ->
                         navController.navigate(Screen.Detail.createRoute(id))
@@ -189,7 +248,7 @@ fun MangaApp() {
                 ChaptersListScreen(
                     mangaTitle = mangaTitle,
                     mangaDexId = mangaDexId,
-                    viewModel = viewModel,
+                    viewModel = mangaViewModel,
                     onBackClick = { navController.popBackStack() },
                     onChapterClick = { chapterId, chapterTitle ->
                         navController.navigate(Screen.ChapterReader.createRoute(chapterId, chapterTitle))
@@ -209,7 +268,7 @@ fun MangaApp() {
                 ChapterReaderScreen(
                     chapterId = chapterId,
                     chapterTitle = chapterTitle,
-                    viewModel = viewModel,
+                    viewModel = mangaViewModel,
                     onBackClick = { navController.popBackStack() }
                 )
             }
