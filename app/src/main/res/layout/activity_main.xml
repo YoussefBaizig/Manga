@@ -1,0 +1,132 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#191C31"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#232640"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:elevation="8dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="OTAKONATION"
+            android:textColor="#FF2E63"
+            android:textStyle="bold"
+            android:letterSpacing="0.15"
+            android:textSize="20sp"
+            android:shadowColor="#000000"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="2"
+            android:layout_marginBottom="16dp"/>
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="#191C31"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp">
+
+            <androidx.appcompat.widget.SearchView
+                android:id="@+id/searchViewAnime"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:iconifiedByDefault="false"
+                android:queryHint="Rechercher..."
+                app:iconTint="#FFFFFF"
+                android:theme="@style/ThemeOverlay.AppCompat.Dark"/>
+        </androidx.cardview.widget.CardView>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="GENRE :"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="#F9ED69"
+                android:letterSpacing="0.1"
+                android:paddingEnd="8dp"/>
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="#2A2E46"
+                app:cardCornerRadius="6dp"
+                app:cardElevation="2dp">
+
+                <Spinner
+                    android:id="@+id/spinnerGenres"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:backgroundTint="#FF2E63"
+                    android:theme="@style/ThemeOverlay.AppCompat.Dark"
+                    android:popupBackground="#232640"
+                    android:dropDownSelector="@android:color/transparent" />
+            </androidx.cardview.widget.CardView>
+        </LinearLayout>
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerViewAnime"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#191C31"
+        android:paddingTop="4dp"
+        android:clipToPadding="false" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="4dp"
+        android:background="#191C31">
+
+        <Button
+            android:id="@+id/previousButton"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:text="PRÉCÉDENT"
+            android:textSize="12sp"
+            android:backgroundTint="#232640"
+            android:textColor="#FF2E63"
+            android:layout_marginEnd="6dp"
+             />
+
+        <Button
+            android:id="@+id/loadMoreButton"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:text="SUIVANT"
+            android:textSize="12sp"
+            android:backgroundTint="#FF2E63"
+            android:textColor="#FFFFFF"
+             />
+
+    </LinearLayout>
+
+
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/compose_view_bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+</LinearLayout>

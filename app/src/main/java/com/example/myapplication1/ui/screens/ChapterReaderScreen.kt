@@ -57,6 +57,7 @@ import com.example.myapplication1.ui.theme.getRecommendedBrightnessForTheme
 import android.provider.Settings
 import android.os.Build
 import android.content.pm.PackageManager
+import android.widget.Toast
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -428,6 +429,28 @@ private fun ChapterReaderContent(
                     currentPageIndex = visibleIndex
                 }
             }
+    }
+    
+    // Show Toast notification when user is too close to screen
+    var lastToastTime by remember { mutableStateOf(0L) }
+    val TOAST_COOLDOWN_MS = 3000L // 3 seconds between toasts
+    
+    LaunchedEffect(lidarState?.isFaceTooClose) {
+        val isTooClose = lidarState?.isFaceTooClose == true
+        val currentTime = System.currentTimeMillis()
+        
+        if (isTooClose && (currentTime - lastToastTime) > TOAST_COOLDOWN_MS) {
+            lastToastTime = currentTime
+            val distanceCm = lidarState?.distanceCm ?: 0f
+            val message = if (distanceCm > 0f) {
+                "⚠️ Too close! Please move at least 30cm away from the screen (current: ${String.format("%.1f", distanceCm)}cm)"
+            } else {
+                "⚠️ Too close! Please move away from the screen"
+            }
+            
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            DebugLogManager.addMessage("LidarSensor", "Toast notification shown: $message", DebugLevel.INFO)
+        }
     }
     
     // Handle horizontal movement for page navigation (with error handling)
