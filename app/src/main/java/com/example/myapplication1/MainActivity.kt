@@ -1,5 +1,6 @@
 package com.example.myapplication1
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -13,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -21,6 +23,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.myapplication1.anime.AnimeMainActivity
 import com.example.myapplication1.ui.navigation.Screen
 import com.example.myapplication1.ui.navigation.bottomNavItems
 import com.example.myapplication1.ui.screens.*
@@ -33,6 +36,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val startRoute = intent.getStringExtra("nav_route") ?: Screen.FirstPage.route
         setContent {
             MangaAppTheme {
                 MangaApp()
@@ -293,12 +297,13 @@ fun MangaApp() {
         }
     }
 }
-
 @Composable
-private fun MangaBottomBar(
+public fun MangaBottomBar(
     currentRoute: String?,
     onNavigate: (String) -> Unit
 ) {
+    val context = LocalContext.current
+
     NavigationBar(
         modifier = Modifier
             .padding(horizontal = 16.dp, vertical = 16.dp)
@@ -309,11 +314,14 @@ private fun MangaBottomBar(
     ) {
         bottomNavItems.forEach { item ->
             val isSelected = currentRoute == item.route
-            
+
             NavigationBarItem(
                 icon = {
                     Icon(
-                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                        imageVector = if (isSelected)
+                            item.selectedIcon
+                        else
+                            item.unselectedIcon,
                         contentDescription = item.title,
                         modifier = Modifier.size(26.dp)
                     )
@@ -325,7 +333,16 @@ private fun MangaBottomBar(
                     )
                 },
                 selected = isSelected,
-                onClick = { onNavigate(item.route) },
+                onClick = {
+                    // 🔴 CAS SPÉCIAL : ANIME → Activity Java
+                    if (item.route == Screen.Anime.route) {
+                        context.startActivity(
+                            Intent(context, AnimeMainActivity::class.java)
+                        )
+                    } else {
+                        onNavigate(item.route)
+                    }
+                },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = CrimsonPrimary,
                     selectedTextColor = CrimsonPrimary,
@@ -337,3 +354,4 @@ private fun MangaBottomBar(
         }
     }
 }
+

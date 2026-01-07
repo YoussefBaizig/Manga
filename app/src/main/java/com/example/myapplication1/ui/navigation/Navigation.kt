@@ -11,6 +11,9 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.ui.graphics.vector.ImageVector
 
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.PlayArrow
+
 /**
  * Navigation routes
  */
@@ -18,6 +21,7 @@ sealed class Screen(val route: String) {
     data object Home : Screen("home")
     data object Search : Screen("search")
     data object Explore : Screen("explore")
+    data object Anime : Screen("anime")
     data object Detail : Screen("detail/{mangaId}") {
         fun createRoute(mangaId: Int) = "detail/$mangaId"
     }
@@ -74,12 +78,20 @@ sealed class BottomNavItem(
         selectedIcon = Icons.Filled.Star,
         unselectedIcon = Icons.Outlined.Star
     )
+
+    data object Anime : BottomNavItem(
+        route = Screen.Anime.route,
+        title = "Anime",
+        selectedIcon = Icons.Filled.PlayArrow,
+        unselectedIcon = Icons.Outlined.PlayArrow
+    )
 }
 
 val bottomNavItems = listOf(
     BottomNavItem.Home,
     BottomNavItem.Search,
     BottomNavItem.Explore,
-    BottomNavItem.Watchlist
+    BottomNavItem.Watchlist,
+    BottomNavItem.Anime
 )
 

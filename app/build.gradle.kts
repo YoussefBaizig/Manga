@@ -70,6 +70,9 @@ dependencies {
     // Room Database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.androidx.cardview)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.recyclerview)
     kapt(libs.room.compiler)
     
     // Biometric authentication
@@ -85,5 +88,18 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+
+
+    //anime
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.github.bumptech.glide:glide:4.13.2")
+    implementation("com.github.darkryh:NoMoreAdsOnMyWebViewPlayer:0.1.1")
+    implementation("org.jsoup:jsoup:1.17.2")
+
+    implementation("androidx.media3:media3-exoplayer:1.3.1")
+    implementation("androidx.media3:media3-ui:1.3.1")
+    
 }
 

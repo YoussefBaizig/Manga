@@ -24,6 +24,9 @@ room = "2.6.1"
 biometric = "1.1.0"
 # Kotlin serialization
 kotlinxSerializationJson = "1.6.2"
+cardview = "1.0.0"
+appcompat = "1.7.1"
+recyclerview = "1.4.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -60,6 +63,9 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 # Material icons extended
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+androidx-cardview = { group = "androidx.cardview", name = "cardview", version.ref = "cardview" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+androidx-recyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "recyclerview" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
