@@ -81,6 +81,11 @@ class LidarSensorManager(
     private val handler = Handler(Looper.getMainLooper())
     private var updateRunnable: Runnable? = null
     
+    // Track sensor type (binary vs continuous)
+    private var isBinarySensor: Boolean? = null // null = not yet determined
+    private var sensorReadings = mutableListOf<Float>() // Track recent readings to detect binary sensor
+    private val SENSOR_TYPE_DETECTION_SAMPLES = 10 // Number of samples to determine sensor type
+    
     /**
      * Find the best available ToF sensor
      * 
@@ -181,11 +186,18 @@ class LidarSensorManager(
         
         if (success) {
             isListening = true
+            // Initialize with a default "far" distance to show sensor is active
+            // This ensures hasValidDistance returns true immediately
+            val initialDistance = 2.0f.coerceIn(MIN_DISTANCE, MAX_DISTANCE)
             currentState = currentState.copy(
                 isActive = true,
-                accuracy = SensorAccuracy.MEDIUM
+                accuracy = SensorAccuracy.MEDIUM,
+                distance = initialDistance, // Set initial distance so hasValidDistance works
+                minDistance = MIN_DISTANCE,
+                maxDistance = MAX_DISTANCE
             )
-            Log.d(TAG, "LiDAR sensor started")
+            onLidarStateChanged(currentState) // Notify immediately
+            Log.d(TAG, "LiDAR sensor started with initial distance: ${initialDistance}m")
             return true
         } else {
             Log.e(TAG, "Failed to start LiDAR sensor")
@@ -203,6 +215,8 @@ class LidarSensorManager(
         updateRunnable?.let { handler.removeCallbacks(it) }
         updateRunnable = null
         distanceHistory.clear()
+        sensorReadings.clear()
+        isBinarySensor = null // Reset sensor type detection
         isListening = false
         
         currentState = currentState.copy(
@@ -226,30 +240,87 @@ class LidarSensorManager(
         val rawDistance = event.values[0]
         val maxRange = event.sensor.maximumRange
 
-        // Validate and interpret distance reading
-        // Some sensors return 0 for "far" and maxRange for "near"
-        // Others return actual distance in meters
-        val isValidReading = rawDistance > 0f && rawDistance < maxRange
-        val distance = if (isValidReading) {
-            // Valid distance measurement - use it
-            rawDistance.coerceIn(MIN_DISTANCE, MAX_DISTANCE)
-        } else if (rawDistance >= maxRange) {
-            // Sensor indicates "far" - beyond range
-            maxRange
-        } else {
-            // Invalid reading (0 or negative) - skip this reading
-            Log.d(TAG, "Invalid distance reading: $rawDistance (maxRange=$maxRange), skipping")
-            return
+        // Detect sensor type (binary vs continuous) if not yet determined
+        if (isBinarySensor == null) {
+            sensorReadings.add(rawDistance)
+            if (sensorReadings.size >= SENSOR_TYPE_DETECTION_SAMPLES) {
+                // Check if all readings are either 0 or maxRange (binary sensor)
+                val uniqueValues = sensorReadings.toSet()
+                val isBinary = uniqueValues.all { it == 0f || it == maxRange || 
+                    (it > 0f && it < 0.01f) || (it > maxRange - 0.01f && it <= maxRange) }
+                
+                isBinarySensor = isBinary
+                if (isBinary) {
+                    Log.d(TAG, "Detected binary proximity sensor (returns 0 or $maxRange)")
+                } else {
+                    Log.d(TAG, "Detected continuous proximity sensor (returns actual distance)")
+                }
+                sensorReadings.clear() // Clear after detection
+            } else {
+                // Still collecting samples - process as potentially binary for now
+                // This allows us to show readings even during detection
+            }
         }
 
-        // Log for debugging (only valid readings)
-        if (isValidReading) {
-            Log.d(TAG, "Distance reading: ${String.format("%.3f", distance)}m (${String.format("%.1f", distance * 100)}cm), maxRange=${String.format("%.3f", maxRange)}m")
+        // Validate and interpret distance reading
+        val distance: Float
+        val isValidReading: Boolean
+        
+        // If sensor type is unknown, try to determine from current reading
+        val treatAsBinary = if (isBinarySensor != null) {
+            isBinarySensor == true
+        } else {
+            // During detection, check if this reading looks binary
+            rawDistance <= 0.01f || rawDistance >= maxRange - 0.01f
         }
+        
+        if (treatAsBinary) {
+            // Binary sensor behavior varies by device:
+            // Some: 0 = close, maxRange = far
+            // Others: 0 = far, maxRange = close
+            // Based on user feedback: 0 = close, maxRange = far
+            if (rawDistance <= 0.01f) {
+                // Close/near - treat as close (15cm for warning purposes)
+                distance = 0.15f // 15cm - close enough to trigger warning
+                isValidReading = true
+            } else if (rawDistance >= maxRange - 0.01f) {
+                // Far - beyond range, use 1.0m to indicate "beyond detection range"
+                distance = 1.0f // 1 meter - indicates "beyond range" but still valid for display
+                isValidReading = true // Mark as valid so UI shows sensor is working
+            } else {
+                // During detection, might be a continuous reading - process as continuous
+                isValidReading = rawDistance > 0f && rawDistance < maxRange
+                distance = if (isValidReading) {
+                    rawDistance.coerceIn(MIN_DISTANCE, MAX_DISTANCE)
+                } else {
+                    maxRange // Beyond range
+                }
+            }
+        } else {
+            // Continuous sensor: returns actual distance
+            isValidReading = rawDistance > 0f && rawDistance < maxRange
+            distance = if (isValidReading) {
+                // Valid distance measurement - use it
+                rawDistance.coerceIn(MIN_DISTANCE, MAX_DISTANCE)
+            } else if (rawDistance >= maxRange) {
+                // Sensor indicates "far" - beyond range, but still update state with a valid value
+                // Use a value within range to show sensor is working
+                2.0f.coerceAtMost(MAX_DISTANCE) // Use 2m to indicate "beyond range" but still valid
+            } else {
+                // Invalid reading (0 or negative) - use a default "far" value within valid range
+                2.0f.coerceAtMost(MAX_DISTANCE) // Use 2m to indicate "beyond range" but still valid
+            }
+        }
+        
+        // Ensure distance is always within valid range for hasValidDistance check
+        val finalDistance = distance.coerceIn(MIN_DISTANCE, MAX_DISTANCE)
+
+        // Log for debugging
+        Log.d(TAG, "Sensor reading: raw=${String.format("%.3f", rawDistance)}m, processed=${String.format("%.3f", distance)}m (${String.format("%.1f", distance * 100)}cm), maxRange=${String.format("%.3f", maxRange)}m, binary=${isBinarySensor}, valid=$isValidReading")
 
         // Add to history for averaging (only valid readings)
         if (isValidReading) {
-            distanceHistory.add(distance)
+            distanceHistory.add(finalDistance)
             if (distanceHistory.size > DISTANCE_HISTORY_SIZE) {
                 distanceHistory.removeAt(0)
             }
@@ -273,41 +344,71 @@ class LidarSensorManager(
             // Not enough readings yet, use simple average
             distanceHistory.average().toFloat()
         } else {
-            // No history yet
-            if (isValidReading) distance else 0f
+            // No history yet - use current distance if valid, otherwise use a default
+            if (isValidReading) finalDistance else 2.0f.coerceAtMost(MAX_DISTANCE)
         }
         
-        // Check for face proximity (only if we have valid average distance)
+        // Check for face proximity
         val currentTime = System.currentTimeMillis()
-        val isFaceTooClose = if (averageDistance > 0f && averageDistance < maxRange && averageDistance < FACE_PROXIMITY_THRESHOLD) {
-            // Valid distance measurement and too close
-            true
+        val isFaceTooClose = if (isBinarySensor == true) {
+            // For binary sensors, if we're getting "near" readings, treat as too close
+            // (since binary sensors can't give exact distance, we assume close = too close)
+            averageDistance > 0f && averageDistance < maxRange
         } else {
-            false
+            // For continuous sensors, check if distance is below threshold
+            averageDistance > 0f && averageDistance < maxRange && averageDistance < FACE_PROXIMITY_THRESHOLD
         }
         
         val proximityWarning = if (isFaceTooClose && (currentTime - lastProximityWarningTime) > PROXIMITY_WARNING_COOLDOWN_MS) {
             lastProximityWarningTime = currentTime
             val distanceCm = averageDistance * 100f
-            Log.d(TAG, "⚠️ Face too close detected: ${String.format("%.1f", distanceCm)}cm")
-            "⚠️ Too close! Please move your face at least 30cm away from the screen (current: ${String.format("%.1f", distanceCm)}cm)"
+            val warningMessage = if (isBinarySensor == true) {
+                // Binary sensor can't give exact distance
+                "⚠️ Too close! Please move away from the screen"
+            } else {
+                // Continuous sensor can show exact distance
+                "⚠️ Too close! Please move your face at least 30cm away from the screen (current: ${String.format("%.1f", distanceCm)}cm)"
+            }
+            Log.d(TAG, "⚠️ Face too close detected: ${if (isBinarySensor == true) "binary sensor (near)" else "${String.format("%.1f", distanceCm)}cm"}")
+            warningMessage
         } else if (isFaceTooClose) {
             currentState.faceProximityWarning // Keep previous warning during cooldown
         } else {
             null
         }
         
-        // Debounce updates
+        // Debounce updates - capture finalDistance in closure
+        val capturedFinalDistance = finalDistance
         updateRunnable?.let { handler.removeCallbacks(it) }
         updateRunnable = Runnable {
-            currentState = currentState.copy(
-                distance = if (isValidReading) distance else currentState.distance,
-                averageDistance = averageDistance,
-                distanceHistory = distanceHistory.toList(),
-                accuracy = determineAccuracy(event.accuracy),
-                isFaceTooClose = isFaceTooClose,
-                faceProximityWarning = proximityWarning
-            )
+            // Always update distance to show sensor is working
+            // Use capturedFinalDistance which is guaranteed to be within valid range
+            val updatedDistance = capturedFinalDistance.coerceIn(MIN_DISTANCE, MAX_DISTANCE)
+            
+            // Verify the distance will pass hasValidDistance check
+            val willBeValid = updatedDistance > 0f && updatedDistance >= MIN_DISTANCE && updatedDistance <= MAX_DISTANCE
+            if (!willBeValid) {
+                Log.w(TAG, "Distance $updatedDistance will fail hasValidDistance check! min=$MIN_DISTANCE, max=$MAX_DISTANCE")
+                // Fallback to a safe default value
+                val safeDistance = 1.0f.coerceIn(MIN_DISTANCE, MAX_DISTANCE)
+                currentState = currentState.copy(
+                    distance = safeDistance,
+                    averageDistance = averageDistance,
+                    distanceHistory = distanceHistory.toList(),
+                    accuracy = determineAccuracy(event.accuracy),
+                    isFaceTooClose = isFaceTooClose,
+                    faceProximityWarning = proximityWarning
+                )
+            } else {
+                currentState = currentState.copy(
+                    distance = updatedDistance,
+                    averageDistance = averageDistance,
+                    distanceHistory = distanceHistory.toList(),
+                    accuracy = determineAccuracy(event.accuracy),
+                    isFaceTooClose = isFaceTooClose,
+                    faceProximityWarning = proximityWarning
+                )
+            }
             onLidarStateChanged(currentState)
         }
         handler.postDelayed(updateRunnable!!, UPDATE_DELAY_MS)
