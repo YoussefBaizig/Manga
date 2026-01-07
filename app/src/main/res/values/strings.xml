@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">MangaVerse</string>
+    <string name="genres_prompt">Choisir un genre</string>
 </resources>
